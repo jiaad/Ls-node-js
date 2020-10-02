@@ -1,0 +1,146 @@
+#!/usr/bin/env node
+const fs = require('fs');
+const colors = require('colors');
+const util = require('util');
+const process = require('process');
+const { throws } = require('assert');    
+const Utils = require('./Utils')
+const ArgvHandler = require('./ArgvHandler')
+// * PROMISIFY callbacks
+const readFile = util.promisify(fs.readFile);
+const openFile = util.promisify(fs.open)
+const fstat = util.promisify(fs.fstat)
+const Stats = util.promisify(fs.stat)
+const fsAccess = util.promisify(fs.access)
+
+
+class Ls {
+
+  constructor() {
+    let utils = new Utils()
+    let argvHandler = new ArgvHandler()
+    //** UTILS FUNCTIONS  */
+    this.spaceCalculator = utils.spaceCalculator
+    this.pushStatsToArray = utils.pushStatsToArray
+    //** ARGV HANDLER FUNCTIONS */
+    this.argvDirectories = argvHandler.argvDirectories
+
+    this.res = new Array
+  }
+
+
+  argvDirectory() {
+  let ar = process.argv.slice(2)
+  let res;
+  if (ar ) {
+    ar.find((value ) =>{
+      if(!value.startsWith('-')){
+        res = value
+      }
+    })
+  }
+  // return res ? res : undefined
+  return res
+}
+
+async  quiIfDirectoryDoesntExist(path) {
+  try {
+  const dir = await fsAccess(path)
+  } catch (e) {
+      const dirPath = e.path.slice(2)
+      throw dirPath + ': No such file or directory'
+  }
+}
+
+async  getFileFD (name, isFile, fd, dirent){
+    try {
+        fd = dirent.name
+        return await openFile(fd)
+    } catch (e) {
+      // console.log('ERROR IN CATCH BLOCK FT_LS : ', e)
+      throw 'ERROR IN CATCH BLOCK: NO FILE OR DIRECTORY'
+    }
+
+}
+
+async  getAllInfoForls() {
+  let fileDescriptor;
+  let directoryName = this.argvDirectory() !== undefined ? this.argvDirectory() : '.'
+  let directory = directoryName ?  `./${directoryName}` : '.'
+
+  await this.quiIfDirectoryDoesntExist(directory)
+  
+  let dir;
+  try {
+    dir = await fs.promises.opendir(directory) // OPEN THE DIR  
+  } catch (e) {
+    // throw `${e} doesn't exists :'(`
+    throw `Command: ${directory} doesn't exists`
+  }
+
+  if(directory !== '.'){
+    process.chdir(directory);
+  }
+  for await (const dirent of dir) {
+    
+    // determine if it's a file of directory
+    const type = dirent.isFile() ? true : false
+    const name =  dirent.name
+
+    const fd = await this.getFileFD(name, type, fileDescriptor, dirent)
+    const stats = await Stats(name) // to Get stats about FILE or DIR
+    const toPush = this.pushStatsToArray(stats, type, name) // CREATE OBJECT FOR ARRAY
+    this.res.push(toPush) // PUSH TO ARRAY
+  } // FOR OF FINISH
+  return this.res
+}
+
+async noFlagLs(stockRes){
+  // let args = this.argvDirectories()
+  let arr = new Array
+  stockRes.forEach((item) => arr.push(item.name))
+  arr.sort().map((item) => process.stdout.write(item + '  '))
+  process.stdout.write(`\n`);
+}
+
+async  lsPrettier() {
+  let name = 'name'  
+  let type = 'type' 
+  let size = 'size'  
+  let created = 'created'
+  let stockRes;
+  try {
+    stockRes = await this.getAllInfoForls()
+  }catch(err){
+    // console.log('ERORORORORORORRO');
+    console.log(err)
+    process.exit(1)
+    // throw err
+    // process.exit(1)
+  }
+  
+  let args = process.argv.slice(2)
+  if(args.length <= 0){
+    this.noFlagLs(stockRes)
+  }else{
+    console.log('mdrrrr',
+    this.argvDirectories()
+    )
+    if(stockRes.length > 0)
+    console.log(`size${this.spaceCalculator(size)}type${this.spaceCalculator(type)}created${this.spaceCalculator(created)}  name`)
+
+    for (let i = 0; i < stockRes.length; i++) {
+      const element = await stockRes[i];
+      // console.log(element.name)
+      const elSize =  String(element.size)
+      const name = element.type === 'directory' ? element.name.blue : element.name
+      console.log(`${element.size}${this.spaceCalculator(elSize)}${element.type}${this.spaceCalculator(element.type)}${element.created.toLocaleDateString("en-US")}${this.spaceCalculator(created)}${name}`)
+    }
+  }
+
+}
+
+}
+
+let lsExec = new Ls()
+lsExec.lsPrettier()
