@@ -1,0 +1,17 @@
+{
+  "name": "node-ls",
+  "version": "1.0.0",
+  "description": "Ls with node.JS",
+  "main": "node",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "bin": {
+    "nls": "./lib/node"
+  },
+  "author": "jiad",
+  "license": "MIT",
+  "dependencies": {
+    "colors": "^1.4.0"
+  }
+}
