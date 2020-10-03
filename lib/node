@@ -5,7 +5,8 @@ const util = require('util');
 const process = require('process');
 const { throws } = require('assert');    
 const Utils = require('./Utils')
-const ArgvHandler = require('./ArgvHandler')
+const ArgvHandler = require('./ArgvHandler');
+const { argv } = require('process');
 // * PROMISIFY callbacks
 const readFile = util.promisify(fs.readFile);
 const openFile = util.promisify(fs.open)
@@ -22,33 +23,21 @@ class Ls {
     //** UTILS FUNCTIONS  */
     this.spaceCalculator = utils.spaceCalculator
     this.pushStatsToArray = utils.pushStatsToArray
+    this.isDirectory = utils.isDirectory
     //** ARGV HANDLER FUNCTIONS */
     this.argvDirectories = argvHandler.argvDirectories
 
     this.res = new Array
   }
 
-
-  argvDirectory() {
-  let ar = process.argv.slice(2)
-  let res;
-  if (ar ) {
-    ar.find((value ) =>{
-      if(!value.startsWith('-')){
-        res = value
-      }
-    })
-  }
-  // return res ? res : undefined
-  return res
-}
-
 async  quiIfDirectoryDoesntExist(path) {
   try {
   const dir = await fsAccess(path)
   } catch (e) {
-      const dirPath = e.path.slice(2)
-      throw dirPath + ': No such file or directory'
+      const dirPath = e.path
+      throw dirPath + ': No such file or directory :`('
+      // return dirPath + ': No such file or directory :`('
+      // console.log(dirPath + ': No such file or directory :`(')
   }
 }
 
@@ -63,36 +52,51 @@ async  getFileFD (name, isFile, fd, dirent){
 
 }
 
-async  getAllInfoForls() {
+async  getAllInfoForls(directoryName = '.') {
+  let res = [];
   let fileDescriptor;
-  let directoryName = this.argvDirectory() !== undefined ? this.argvDirectory() : '.'
-  let directory = directoryName ?  `./${directoryName}` : '.'
-
-  await this.quiIfDirectoryDoesntExist(directory)
-  
+  // let directoryName = this.argvDirectory() !== undefined ? this.argvDirectory() : '.'
+  let directory = directoryName !== '.' ?  `./${directoryName}` : '.'
+  await this.quiIfDirectoryDoesntExist(directoryName)
   let dir;
   try {
     dir = await fs.promises.opendir(directory) // OPEN THE DIR  
   } catch (e) {
     // throw `${e} doesn't exists :'(`
-    throw `Command: ${directory} doesn't exists`
+    // throw `Command: ${directory} doesn't exists`
+    return `Command: ${directory} doesn't exists`
+
+  }
+  try {
+    if(directory !== '.'){
+      process.chdir(directory);
+      console.log(directory.red)
+    }
+  } catch (e) {
+    console.error(`chdir: ${e}`);
   }
 
-  if(directory !== '.'){
-    process.chdir(directory);
-  }
+
   for await (const dirent of dir) {
     
     // determine if it's a file of directory
     const type = dirent.isFile() ? true : false
     const name =  dirent.name
-
-    const fd = await this.getFileFD(name, type, fileDescriptor, dirent)
+    try {
+      const fd = await this.getFileFD(name, type, fileDescriptor, dirent)
+    } catch (error) {
+      console.log(error)
+    }
     const stats = await Stats(name) // to Get stats about FILE or DIR
     const toPush = this.pushStatsToArray(stats, type, name) // CREATE OBJECT FOR ARRAY
-    this.res.push(toPush) // PUSH TO ARRAY
+    res.push(toPush) // PUSH TO ARRAY
   } // FOR OF FINISH
-  return this.res
+
+  if (directory !== '.') {
+    process.chdir('../')
+  }
+  // console.log(this.res)
+  return res
 }
 
 async noFlagLs(stockRes){
@@ -100,45 +104,85 @@ async noFlagLs(stockRes){
   let arr = new Array
   stockRes.forEach((item) => arr.push(item.name))
   arr.sort().map((item) => process.stdout.write(item + '  '))
+  console.log('izizizizi')
   process.stdout.write(`\n`);
 }
 
-async  lsPrettier() {
-  let name = 'name'  
-  let type = 'type' 
-  let size = 'size'  
-  let created = 'created'
-  let stockRes;
-  try {
-    stockRes = await this.getAllInfoForls()
-  }catch(err){
-    // console.log('ERORORORORORORRO');
-    console.log(err)
-    process.exit(1)
-    // throw err
-    // process.exit(1)
+async loopShowFilesAndDirectories(stockResult){
+  for (let i = 0; i < stockResult.length; i++) {
+    const element = stockResult[i];
+    const elSize = String(element.size)
+    const name = element.type === 'directory' ? element.name.blue : element.name
+    process.stdout.write(name + '          ')
   }
-  
-  let args = process.argv.slice(2)
-  if(args.length <= 0){
-    this.noFlagLs(stockRes)
-  }else{
-    console.log('mdrrrr',
-    this.argvDirectories()
-    )
-    if(stockRes.length > 0)
-    console.log(`size${this.spaceCalculator(size)}type${this.spaceCalculator(type)}created${this.spaceCalculator(created)}  name`)
-
-    for (let i = 0; i < stockRes.length; i++) {
-      const element = await stockRes[i];
-      // console.log(element.name)
-      const elSize =  String(element.size)
-      const name = element.type === 'directory' ? element.name.blue : element.name
-      console.log(`${element.size}${this.spaceCalculator(elSize)}${element.type}${this.spaceCalculator(element.type)}${element.created.toLocaleDateString("en-US")}${this.spaceCalculator(created)}${name}`)
-    }
-  }
-
 }
+
+  async noFlagButWithDirectories(){
+    let args = process.argv.slice(2)
+    if(args.length <= 0){
+      try {
+        await this.getAllInfoForls()
+      } catch (e) {
+        throw 'ERROR LS : noFlagButWithDirectories FUNCTION' + e
+      }
+    }
+    else{
+      try {
+
+        let dirNames = this.argvDirectories()
+        for (let i = 0; i < dirNames.length; i++) {
+          const directoryName = dirNames[i];
+          let exists;
+          try {
+            exists = await this.isDirectory(directoryName)
+          } catch (e) {
+            console.log(e, "___")
+          }
+          
+          try {
+            var stockResult = await this.getAllInfoForls(directoryName)
+          } catch (e) {
+            console.log(e)
+          }
+          if(exists == true)
+            this.loopShowFilesAndDirectories(stockResult)
+
+          process.stdout.write('\n\n')
+        }
+
+      } catch (e) {
+        console.log(e)
+      }
+      
+  }
+  }
+
+  async  lsPrettier() {
+    let name = 'name'  
+    let type = 'type' 
+    let size = 'size'  
+    let created = 'created'
+    let stockRes;
+
+    let args = process.argv.slice(2)
+
+    if(args.length <= 0){
+      try {
+        let stockRes = await this.getAllInfoForls()
+        this.noFlagLs(stockRes)
+      } catch (e) {
+        throw `NOFLAGS : ERROR : ${e}`
+      }
+    }else{
+      try {
+        this.noFlagButWithDirectories()
+      } catch (e) {
+        console.log('LAST E:', e)
+        // throw 'THERE IS A PROBLEM'
+      }
+    }
+
+  }
 
 }
 
