@@ -15,25 +15,14 @@ const Stats = util.promisify(fs.stat)
 const fsAccess = util.promisify(fs.access)
 
 
-class Ls extends ArgvHandler {
+class Ls {
 
   constructor() {
-    super()
-    /**
-     * this Class inherits from ARGVHANDLER AND UTILS
-     */
+    this.utils = new Utils()
+    this.argvHandler = new ArgvHandler()
   }
 
-async  printErrorIfDirNotExists(path) {
-  try {
-  const dir = await fsAccess(path)
-  } catch (e) {
-      const dirPath = e.path
-      throw dirPath + ': No such file or directory :`('
-      // return dirPath + ': No such file or directory :`('
-      // console.log(dirPath + ': No such file or directory :`(')
-  }
-}
+
 
 async  getFileFD (name, isFile, fd, dirent){
     try {
@@ -49,7 +38,7 @@ async  getFileFD (name, isFile, fd, dirent){
 async  getAllInfoForls(directoryName = '.') {
   let res = [];
   let fileDescriptor;
-  // let directoryName = this.argvDirectory() !== undefined ? this.argvDirectory() : '.'
+  // let directoryName = this.argvHandler.argvDirectory() !== undefined ? this.argvDirectory() : '.'
   let directory = directoryName !== '.' ?  `./${directoryName}` : '.'
   // await this.quiIfDirectoryDoesntExist(directoryName)
   let dir;
@@ -82,7 +71,7 @@ async  getAllInfoForls(directoryName = '.') {
       console.log(error)
     }
     const stats = await Stats(name) // to Get stats about FILE or DIR
-    const toPush = this.pushStatsToArray(stats, type, name) // CREATE OBJECT FOR ARRAY
+    const toPush = this.utils.pushStatsToArray(stats, type, name) // CREATE OBJECT FOR ARRAY
     res.push(toPush) // PUSH TO ARRAY
   } // FOR OF FINISH
 
@@ -94,7 +83,7 @@ async  getAllInfoForls(directoryName = '.') {
 }
 
 async noFlagLs(stockRes){
-  // let args = this.argvDirectories()
+  // let args = this.argvHandler.argvDirectories()
   let arr = new Array
   stockRes.forEach((item) => arr.push(item.name))
   arr.sort().map((item) => process.stdout.write(item + '  '))
@@ -134,12 +123,12 @@ async loopShowFilesAndDirectories(stockResult){
     }
     else{
       try {
-        await this.showDirectoryErrors()
+        await this.argvHandler.showDirectoryErrors()
         process.stdout.write('\n')
-        let dirNames = await this.argvDirectories()
+        let dirNames = await this.argvHandler.argvDirectories()
         for (let i = 0; i < dirNames.length; i++) {
           const directoryName = dirNames[i];
-          let exists = await this.doesFileOrDirExists(directoryName)
+          let exists = await this.utils.doesFileOrDirExists(directoryName)
           try {
             var stockResult = await this.getAllInfoForls(directoryName)
           } catch (e) {
