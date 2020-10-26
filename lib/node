@@ -13,6 +13,7 @@ const openFile = util.promisify(fs.open)
 const fstat = util.promisify(fs.fstat)
 const Stats = util.promisify(fs.stat)
 const fsAccess = util.promisify(fs.access)
+const lstat = util.promisify(fs.lstat)
 
 
 class Ls {
@@ -45,8 +46,6 @@ async  getAllInfoForls(directoryName = '.') {
   try {
     dir = await fs.promises.opendir(directory) // OPEN THE DIR  
   } catch (e) {
-    // throw `${e} doesn't exists :'(`
-    // throw `Command: ${directory} doesn't exists`
     throw `Command: ${directory} doesn't exists`
 
 
@@ -68,7 +67,8 @@ async  getAllInfoForls(directoryName = '.') {
     try {
       const fd = await this.getFileFD(name, type, fileDescriptor, dirent)
     } catch (error) {
-      console.log(error)
+      // console.log(error)
+      process.stdout.write(error + "\n")
     }
     const stats = await Stats(name) // to Get stats about FILE or DIR
     const toPush = this.utils.pushStatsToArray(stats, type, name) // CREATE OBJECT FOR ARRAY
@@ -87,7 +87,7 @@ async noFlagLs(stockRes){
   let arr = new Array
   stockRes.forEach((item) => arr.push(item.name))
   arr.sort().map((item) => process.stdout.write(item + '  '))
-  console.log('izizizizi')
+  process.stdout.write('-------------------------')
   process.stdout.write(`\n`);
 }
 
@@ -101,7 +101,21 @@ async loopShowFilesAndDirectories(stockResult){
   process.stdout.write('\n\n')
 }
 
-
+  async lsOneArgFileorDir(args){
+    try {
+      let name = args//.slice(2)
+      let fileOrDir = await lstat(args)
+      let res = await fileOrDir.isDirectory()
+      if(res === true){
+        let stockResult = await this.getAllInfoForls(args)
+        this.loopShowFilesAndDirectories(stockResult)
+      }else{
+        process.stdout.write(args + "\n")
+      }
+    } catch (e) {
+      throw `ls: ${e.path}no such file or directory XD`
+    }
+  }
 //////////// MAKE A GLOBAL TRY
   async noFlagButWithDirectories(){
     let args = process.argv.slice(2)
@@ -111,31 +125,41 @@ async loopShowFilesAndDirectories(stockResult){
           await this.noFlagLs(stockRes)
       }
       else if(args.length === 1){
+        try{
           let directoryName = args[0]
-          let stockResult = await this.getAllInfoForls(directoryName)
-          this.loopShowFilesAndDirectories(stockResult)
+          await this.lsOneArgFileorDir(directoryName)
+        }catch(err){
+          // console.log(err)
+          process.stdout.write(err)
+        }
       }
       else{
-          await this.argvHandler.showDirectoryErrors()
-          process.stdout.write('\n')
-          let dirNames = await this.argvHandler.argvDirectories()
-          for (let i = 0; i < dirNames.length; i++) {
-            const directoryName = dirNames[i];
+          await this.argvHandler.showDirectoryErrors() // show errors
+
+          let {files, dirs} = await this.argvHandler.argvDirectories() // get an array of object {files, dirs} // destructuring
+          let len = dirs.length
+
+          files.map(a => process.stdout.write(a + "         "))
+          files.length >= 1 ? process.stdout.write("\n"): null // Print them
+
+          for (let i = 0; i < len; i++) {
+            let stockResult;
+            const directoryName = dirs[i];
             let exists = await this.utils.doesFileOrDirExists(directoryName)
             try {
-              var stockResult = await this.getAllInfoForls(directoryName)
+              stockResult = await this.getAllInfoForls(directoryName)
             } catch (e) {
-              console.log(e)
+              // console.log(e)
+              process.stdout.write(e)
             }
             if(exists == true){
-              console.log(directoryName + ":")
+              process.stdout.write(directoryName + ":" + "\n")
               this.loopShowFilesAndDirectories(stockResult)
             }
           }
-        
     }
     }catch(error){
-      console.log("THE ERROR NOFLAGWITHDIRECTORIES:",error)
+      process.stdout.write("THE ERROR NOFLAGWITH DIRECTORIES: " + error + "\n")
     }
 
   }
@@ -151,7 +175,7 @@ async loopShowFilesAndDirectories(stockResult){
       try {
         await this.noFlagButWithDirectories()
       } catch (e) {
-        console.log('LAST E:', e)
+        process.stdout.write("LAST E : " + e)
       }
 
   }
