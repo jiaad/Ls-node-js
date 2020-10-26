@@ -105,46 +105,39 @@ async loopShowFilesAndDirectories(stockResult){
 //////////// MAKE A GLOBAL TRY
   async noFlagButWithDirectories(){
     let args = process.argv.slice(2)
-    if(args.length <= 0){ /// if no argument, then print current directory
-      try {
-        await this.getAllInfoForls()
-      } catch (e) {
-        console.log(e, '****')
+    try{
+      if(args.length <= 0){ /// if no argument, then print current directory
+          let stockRes = await this.getAllInfoForls()
+          await this.noFlagLs(stockRes)
       }
-    }
-    else if(args.length === 1){
-      try{
-        let directoryName = args[0]
-        let stockResult = await this.getAllInfoForls(directoryName)
-        this.loopShowFilesAndDirectories(stockResult)
-      }catch(err){
-        console.log(err)
+      else if(args.length === 1){
+          let directoryName = args[0]
+          let stockResult = await this.getAllInfoForls(directoryName)
+          this.loopShowFilesAndDirectories(stockResult)
       }
+      else{
+          await this.argvHandler.showDirectoryErrors()
+          process.stdout.write('\n')
+          let dirNames = await this.argvHandler.argvDirectories()
+          for (let i = 0; i < dirNames.length; i++) {
+            const directoryName = dirNames[i];
+            let exists = await this.utils.doesFileOrDirExists(directoryName)
+            try {
+              var stockResult = await this.getAllInfoForls(directoryName)
+            } catch (e) {
+              console.log(e)
+            }
+            if(exists == true){
+              console.log(directoryName + ":")
+              this.loopShowFilesAndDirectories(stockResult)
+            }
+          }
+        
     }
-    else{
-      try {
-        await this.argvHandler.showDirectoryErrors()
-        process.stdout.write('\n')
-        let dirNames = await this.argvHandler.argvDirectories()
-        for (let i = 0; i < dirNames.length; i++) {
-          const directoryName = dirNames[i];
-          let exists = await this.utils.doesFileOrDirExists(directoryName)
-          try {
-            var stockResult = await this.getAllInfoForls(directoryName)
-          } catch (e) {
-            console.log(e)
-          }
-          if(exists == true){
-            console.log(directoryName + ":")
-            this.loopShowFilesAndDirectories(stockResult)
-          }
-        }
+    }catch(error){
+      console.log("THE ERROR NOFLAGWITHDIRECTORIES:",error)
+    }
 
-      } catch (e) {
-        console.log(e, '°°°')
-      }
-      
-  }
   }
 
   async  lsPrettier() {
@@ -155,22 +148,11 @@ async loopShowFilesAndDirectories(stockResult){
     let stockRes;
 
     let args = process.argv.slice(2)
-
-    if(args.length <= 0){
       try {
-        let stockRes = await this.getAllInfoForls()
-        this.noFlagLs(stockRes)
-      } catch (e) {
-        console.log(`NOFLAGS : ERROR : ${e}`)
-      }
-    }else{
-      try {
-        this.noFlagButWithDirectories()
+        await this.noFlagButWithDirectories()
       } catch (e) {
         console.log('LAST E:', e)
-        // throw 'THERE IS A PROBLEM'
       }
-    }
 
   }
 
