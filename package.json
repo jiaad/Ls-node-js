@@ -12,6 +12,10 @@
   "author": "jiad",
   "license": "MIT",
   "dependencies": {
+    "@babel/core": "^7.12.3",
     "colors": "^1.4.0"
+  },
+  "devDependencies": {
+    "@babel/preset-env": "^7.12.1"
   }
 }
