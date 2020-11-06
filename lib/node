@@ -17,18 +17,15 @@ const Stats = util.promisify(fs.stat)
 const fsAccess = util.promisify(fs.access)
 const lstat = util.promisify(fs.lstat)
 const exec = util.promisify(childProcess.exec)
-class Ls {
+const readDir = util.promisify(fs.readdir)
 
-  constructor() {
+class Main{
+  constructor(props) {
     this.utils = new Utils()
     this.argvHandler = new ArgvHandler()
-    // let p = await this.argvHandler.changeDir()
-    // console.log('lmao', p)
   }
 
-
-
-async  getFileFD (fd, dirent){
+  async  getFileFD (fd, dirent){
     try {
         fd = dirent.name
         return await openFile(fd)
@@ -39,81 +36,67 @@ async  getFileFD (fd, dirent){
 
 }
 
-async  getAllInfoForls(directoryName = '.') {
-  let res = [];
-  let fileDescriptor;
-  let directory = directoryName !== '.' ?  `./${directoryName}` : '.'
-  let dir;
-  try {
-    dir = await fs.promises.opendir(directory) // OPEN THE DIR  
-  } catch (e) {
-    throw `Command: ${directory} doesn't exists`
-  }
-    // if directory does change, it will enter into the mentionned directory
-    // Got rid of try catch block, not necessary
-    if(directory !== '.'){
-      process.chdir(directory);
+  async getAllInfoForls(path='.'){
+
+    let res = []
+    let currentDir = process.cwd()
+    let directory = path !== '.' ?  `./${path}` : '.'
+    let dir = await readDir(directory)
+
+    process.chdir(directory) // gi to the dir ro read inside
+
+    for (const dirent of dir) {
+      let stat = await Stats(dirent)
+      let type = stat.isFile()
+      let objToPush = this.utils.pushStatsToArray(stat,type, dirent)
+      res.push(objToPush)
     }
-  for await (const dirent of dir) {
+    return res
+  }
+
+
+  async loopShowFilesAndDirectories(stockResult){
+    // let i = 0
+    for (let i = 0; i < stockResult.length; i++) {
+      const element = stockResult[i];
+      const elSize = String(element.size)
+      let name = element.name
+      name = await this.utils.colorizeOutput(element)
+      process.stdout.write(name + '           ')
+    }
+    // console.log(stockResult)
+    // if(i === stockResult.length - 1)
+      process.stdout.write('\n')
+  }
+
+
+
+  async  handlePath(){
+    // let {files, dirs} = await this.argvHandler.argvDirectories() // get an array of object {files, dirs} // destructuring
+
+    let curr = process.cwd()
+    let res = []
+    let args = process.argv.slice(2)
+    for (let i = 0; i < args.length; i++) {
+      let filesAndDirs = await this.getAllInfoForls(args[i])
+        await this.loopShowFilesAndDirectories(filesAndDirs)
+      process.chdir(curr)
+    }
+    // console.log(res)
+  }
+
+  async noFlagLs(stockRes){
+    // let sorted  = stockRes.sort((a, b) => a.name.localeCompare(b.name))
     
-    // determine if it's a file of directory
-    const type = dirent.isFile() ? true : false
-    const name =  dirent.name
-    try {
-      const fd = await this.getFileFD(fileDescriptor, dirent)
-    } catch (error) {
-      process.stdout.write(error + "\n")
-    }
-    const stats = await Stats(name) // to Get stats about FILE or DIR
-    const toPush = this.utils.pushStatsToArray(stats, type, name) // CREATE OBJECT FOR ARRAY
-    res.push(toPush) // PUSH TO ARRAY
-  } // FOR OF FINISH
-
-  if (directory !== '.') 
-    process.chdir('../')
-
-  return res
-}
-
-async noFlagLs(stockRes){
-  let sorted  = stockRes.sort((a, b) => a.name.localeCompare(b.name))
-  sorted.forEach(async element => {
-    element = await this.utils.colorizeOutput(element)
-    process.stdout.write(element + '      ')
-  });
-}
-
-async loopShowFilesAndDirectories(stockResult){
-  let i = 0
-  for (i = 0; i < stockResult.length; i++) {
-    const element = stockResult[i];
-    const elSize = String(element.size)
-    let name = element.name
-    name = await this.utils.colorizeOutput(element)
-    process.stdout.write(name + '           ')
+    stockRes.forEach(async element => {
+      element = await this.utils.colorizeOutput(element)
+      process.stdout.write(element + '      ')
+    });
   }
-  // console.log(stockResult)
-  // if(i === stockResult.length - 1)
-    process.stdout.write('\n')
-}
 
-  async lsOneArgFileorDir(args){
-    try {
-      // let name = args//.slice(2)
-      let fileOrDir = await lstat(args)
-      let res = await fileOrDir.isDirectory()
-      if(res === true){
-        let stockResult = await this.getAllInfoForls(args)
-        this.loopShowFilesAndDirectories(stockResult)
-      }else{
-        process.stdout.write(args + "\n")
-      }
-    } catch (e) {
-      throw `ls: ${e.path} no such file or directory XD\n`
-    }
-  }
   async lsAllFilesAndDirectories(){
     let {files, dirs} = await this.argvHandler.argvDirectories() // get an array of object {files, dirs} // destructuring
+    let curr = process.cwd()
     // PRINT FILES BEFORE DIRS
     files.upcaseFiles.map(a => process.stdout.write(a + "         "))
     files.downcaseFiles.map(a => process.stdout.write(a + " "))
@@ -133,21 +116,28 @@ async loopShowFilesAndDirectories(stockResult){
         await this.loopShowFilesAndDirectories(stockResult)
       if(!(i === (len - 1) ))
         process.stdout.write('\n')
+      process.chdir(curr) // GO BACK TO THE ROOT WHERE EVERYTHING STARTED
+
     }
   }
-//////////// MAKE A GLOBAL TRY
+
+
   async lsOutput(){
     let args = process.argv.slice(2)
     try{
       if(args.length <= 0){ /// if no argument, then print current directory
-          let stockRes = await this.getAllInfoForls()
-          await this.noFlagLs(stockRes)
+        let stockRes = await this.getAllInfoForls()
+        let files = await this.utils.sortFilesAndDirs(stockRes)
+          let data = [...files.up, ...files.low]
+          await this.noFlagLs([...files.up, ...files.low])
           process.stdout.write('\n')
       }
       else if(args.length === 1){
+        // console.log("THIS US HERE")
         try{
           let directoryName = args[0]
-          await this.lsOneArgFileorDir(directoryName)
+          // console.log( directoryName)
+          await this.handlePath('lmao')
         }catch(err){
           // console.log(err)
           process.stdout.write(err)
@@ -156,12 +146,14 @@ async loopShowFilesAndDirectories(stockResult){
       else{
         await this.argvHandler.showDirectoryErrors() // show errors
         await this.lsAllFilesAndDirectories()// this does show everything
+        
       } // else
     }catch(error){
-      process.stdout.write("THE ERROR NOFLAGWITH DIRECTORIES: " + error + "\n")
+      process.stdout.write("THE ERROR NO FLAGWITH DIRECTORIES: " + error + "\n")
     }
 
   }
+
 
   async  lsPrettier() {
     let name = 'name'  
@@ -178,8 +170,7 @@ async loopShowFilesAndDirectories(stockResult){
       }
 
   }
-
 }
 
-let lsExec = new Ls()
-lsExec.lsPrettier()
+let LS = new Main()
+LS.lsPrettier()
