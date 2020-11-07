@@ -84,14 +84,35 @@ class Main{
     }
     // console.log(res)
   }
+  async lsOneArgFileorDir(args){
+    try {
+      // let name = args//.slice(2)
+      let fileOrDir = await lstat(args)
+      let res = await fileOrDir.isDirectory()
+      if(res === true){
+        let stockResult = await this.getAllInfoForls(args)
+        this.loopShowFilesAndDirectories(stockResult)
+      }else{
+        process.stdout.write(args + "\n")
+      }
+    } catch (e) {
+      throw `ls: ${e.path} no such file or directory XD\n`
+    }
+  }
 
   async noFlagLs(stockRes){
     // let sorted  = stockRes.sort((a, b) => a.name.localeCompare(b.name))
-    
+    let res = ""
     stockRes.forEach(async element => {
       element = await this.utils.colorizeOutput(element)
-      process.stdout.write(element + '      ')
+      // res+=`${element}      `
+      process.stdout.write(element + "      ")
     });
+    // for (const element of stockRes) {
+    //   let el = await this.utils.colorizeOutput(element)
+    //   res+=`${el}      `
+    // }
+    // process.stdout.write(res)
   }
 
   async lsAllFilesAndDirectories(){
@@ -121,23 +142,47 @@ class Main{
     }
   }
 
-
+  async lFlag(getData){
+   getData.forEach(async list => {
+      //                   -rw-r--r--    1 jiad  staff      62  6 Nov 19:04 Makefile
+            //                           link  jiad    staff          size birthDatz        name 
+      // process.stdout.write(" -rw-r--r-- "+ " " + list.size + " jiad " + " " + list.size + " " + list.ctimeMs + " " + list.name + '\n')
+      // process.stdout.write(" -rw-r--r-- "+ " " + list.size + " jiad " + " " + list.size + " " + list.ctimeMs + " " + list.name + '\n')
+      let sec = list.mtimeMs
+      let time = await this.utils.timeFormatLFlag(sec)
+      console.log("-rw-r--r--    1 jiad  staff      62  " + time + "   " + Number((list.mode).toString(8))) 
+    })
+  }
   async lsOutput(){
     let args = process.argv.slice(2)
     try{
-      if(args.length <= 0){ /// if no argument, then print current directory
+      if(args.length === 1 && args[0][0] === "-"){
         let stockRes = await this.getAllInfoForls()
-        let files = await this.utils.sortFilesAndDirs(stockRes)
-          let data = [...files.up, ...files.low]
-          await this.noFlagLs([...files.up, ...files.low])
+        let data = await this.utils.sendDataIfFlagOrNot(stockRes, args)
+        // console.log('-------', data)
+        if(args[0].includes('l')){
+          // console.log('DATA =', data)
+          await this.lFlag(data)
+        }else{
+          await this.noFlagLs(data)
+        }
+      }
+      else if(args.length <= 0){ /// if no argument, then print current directory
+        let stockRes = await this.getAllInfoForls()
+        // let files = await this.utils.sortFilesAndDirs(stockRes)
+          let data = await this.utils.sendDataIfFlagOrNot(stockRes, args)
+          // console.log('data ==== ', data)
+          await this.noFlagLs(data)
+
+          // let flagHandle = await this.ifFlagExists(stockRes, args)
+          
           process.stdout.write('\n')
       }
       else if(args.length === 1){
-        // console.log("THIS US HERE")
         try{
           let directoryName = args[0]
           // console.log( directoryName)
-          await this.handlePath('lmao')
+          await this.lsOneArgFileorDir(directoryName)
         }catch(err){
           // console.log(err)
           process.stdout.write(err)
@@ -149,7 +194,7 @@ class Main{
         
       } // else
     }catch(error){
-      process.stdout.write("THE ERROR NO FLAGWITH DIRECTORIES: " + error + "\n")
+      process.stdout.write("ILLELEGAL OPERATIONS THE ERROR NO FLAGWITH DIRECTORIES: " + error + "\n")
     }
 
   }
