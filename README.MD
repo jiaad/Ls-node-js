@@ -21,14 +21,18 @@
 ```
 
 ### Testing within the directory
-```
-  make create
 
+- To Create all test files and dirs
+  - `make create` or `npm run create`
+
+```
   // it will create a folder called manualTesting/
+  // if manualTesting/ already exists, it will be deleted and recreated
   // and it will created some dirs and files inside manualTesting/
   // it will take you to the dir automatically
   // you can execute commands
-
 ```
+- To delete all files and dirs
+  - `make delete` or `npm run delete`
 
 

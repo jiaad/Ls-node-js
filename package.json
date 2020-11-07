@@ -4,7 +4,9 @@
   "description": "Ls with node.JS",
   "main": "node",
   "scripts": {
-    "test": "jest"
+    "test": "jest",
+    "create": "bash createFiles.sh",
+    "delete": "bash delete.sh"
   },
   "bin": {
     "nls": "./lib/node"
